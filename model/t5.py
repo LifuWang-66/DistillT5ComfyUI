@@ -241,10 +241,16 @@ class T5Base(torch.nn.Module):
     def set_input_embeddings(self, embeddings):
         self.shared = embeddings
 
-    def forward(self, input_ids, *args, **kwargs):
-        x = self.shared(input_ids, out_dtype=kwargs.get("dtype", torch.float32))
+    def forward(self, input_ids=None, attention_mask=None, embeds=None, num_tokens=None, intermediate_output=None, final_layer_norm_intermediate=True, **kwargs):
+        if input_ids is not None:
+            x = self.shared(input_ids, out_dtype=kwargs.get("dtype", torch.float32))
+        elif embeds is not None:
+            x = embeds
+        else:
+            raise ValueError("Either input_ids or embeds must be provided")
+        
         if self.dtype not in [torch.float32, torch.float16, torch.bfloat16]:
-            x = torch.nan_to_num(x) #Fix for fp8 T5 base
-        encoder_outputs = self.encoder(x, *args, **kwargs)
+            x = torch.nan_to_num(x)  # Fix for fp8 T5 base
+        encoder_outputs = self.encoder(x, attention_mask=attention_mask, intermediate_output=intermediate_output, final_layer_norm_intermediate=final_layer_norm_intermediate, dtype=kwargs.get("dtype", torch.float32))
         output = self.final_projection(encoder_outputs[0])
         return (output,)
